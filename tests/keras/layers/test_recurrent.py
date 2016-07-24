@@ -122,6 +122,11 @@ def test_LSTM():
 
 
 @keras_test
+def test_Clockwork():
+    _runner(recurrent.Clockwork)
+
+
+@keras_test
 def test_masking_layer():
     ''' This test based on a previously failing issue here:
     https://github.com/fchollet/keras/issues/1567
