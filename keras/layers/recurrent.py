@@ -888,7 +888,7 @@ class Clockwork(SimpleRNN):
             'Output dimension ({}) must be divisible '.format(output_dim) +
             'by the number of periods ({}) since modules are equally sized '.format(len(periods)) +
             'and each module must have its own period.')
-        self.periods = np.asarray(sorted(periods))
+        self.periods = list(sorted(periods))
 
         super(Clockwork, self).__init__(output_dim, **kwargs)
 
@@ -897,14 +897,14 @@ class Clockwork(SimpleRNN):
         n = self.output_dim // len(self.periods)
 
         module_mask = np.zeros((self.output_dim, self.output_dim), K.floatx())
-        periods = np.zeros((self.output_dim,), np.int16)
+        module_periods = np.zeros((self.output_dim,), np.int16)
 
         for i, t in enumerate(self.periods):
             module_mask[i*n:, i*n:(i+1)*n] = 1
-            periods[i*n:(i+1)*n] = t
+            module_periods[i*n:(i+1)*n] = t
 
         module_mask = K.variable(module_mask, name='module_mask')
-        self.periods = K.variable(periods, name='periods')
+        self.module_periods = K.variable(module_periods, name='module_periods')
 
         super(Clockwork, self).build(input_shape)
 
@@ -950,11 +950,11 @@ class Clockwork(SimpleRNN):
 
 
     def get_constants(self, x):
-        return super(Clockwork, self).get_constants(x) + [self.periods]
+        return super(Clockwork, self).get_constants(x) + [self.module_periods]
 
     def step(self, x, states):
         # B_U and B_W are dropout weights
-        prev_output, time_step, B_U, B_W, periods = states
+        prev_output, time_step, B_U, B_W, module_periods = states
 
         if self.consume_less == 'cpu':
             h = x
@@ -965,7 +965,7 @@ class Clockwork(SimpleRNN):
 
         # note: switch evaluates the expression for each element so only
         # the modules which period matches the time step is activated here.
-        output = K.switch(K.equal(time_step % periods, 0.), output, prev_output)
+        output = K.switch(K.equal(time_step % module_periods, 0.), output, prev_output)
         return output, [output, time_step+1]
 
     def get_config(self):
